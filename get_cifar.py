@@ -37,9 +37,9 @@ def cifar_10_image(batch, index):
         f.seek(index*3073)
         label = get(f.read(1))
 
-        image = np.zeros([3,1024], dtype=np.int16)
+        image = np.zeros([3*1024], dtype=np.int16)
         for c, pix in product(range(3), range(1024)):
-            image[c,pix] = get(f.read(1))
+            image[c*1024+pix] = get(f.read(1))
 
         return label, image
 
@@ -67,9 +67,9 @@ def cifar_100_image(index):
         c_label = get(f.read(1))
         f_label = get(f.read(1))
 
-        image = np.zeros([3,1024], dtype=np.int16)
+        image = np.zeros([3*1024], dtype=np.int16)
         for c, pix in product(range(3), range(1024)):
-            image[c,pix] = get(f.read(1))
+            image[c*1024+pix] = get(f.read(1))
 
         return c_label, f_label, image
 
