@@ -268,8 +268,6 @@ for task in range(n_tasks):
 
 	sess.run(update_big_omega, feed_dict = {task_vector: tv})
 	omegas = sess.run(big_omega_var)
-	print(omegas)
-	quit()
 
 	sess.run(reset_small_omega)
 
