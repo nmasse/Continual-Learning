@@ -33,12 +33,12 @@ def cifar_10_image(index, batch=1, test=False):
     # index can be 0 through 9,999, or 0 through 999 for testing
     if test:
         path = './cifar-10-batches-bin/test_batch.bin'
-        if index > 999:
-            raise Exception('CIFAR-10 test index is too large: ' + str(index))
+        if index > 999, index < 0:
+            raise Exception('CIFAR-10 test index is invalid: ' + str(index))
     else:
         path = './cifar-10-batches-bin/data_batch_' + str(batch) + '.bin'
-        if index > 9999:
-            raise Exception('CIFAR-10 train index is too large: ' + str(index))
+        if index > 9999, index < 0:
+            raise Exception('CIFAR-10 train index is invalid: ' + str(index))
         if batch < 1 or batch > 5:
             raise Exception('CIFAR-10 batch number is invalid: ' + str(batch))
 
@@ -71,12 +71,12 @@ def cifar_100_image(index, test=False):
     # index can be 0 through 49,999, or 0 through 9,999 for testing
     if test:
         path = './cifar-100-binary/test.bin'
-        if index > 9999:
-            raise Exception('CIFAR-10 test index is too large: ' + str(index))
+        if index > 9999, index < 0:
+            raise Exception('CIFAR-100 test index is invalid: ' + str(index))
     else:
         path = './cifar-100-binary/train.bin'
-        if index > 49999:
-            raise Exception('CIFAR-10 train index is too large: ' + str(index))
+        if index > 49999, index < 0:
+            raise Exception('CIFAR-100 train index is invalid: ' + str(index))
 
     with open(path, 'rb') as f:
         f.seek(index*3073)
