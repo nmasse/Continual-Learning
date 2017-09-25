@@ -1,11 +1,14 @@
 import tensorflow as tf
 import numpy as np
+import get_cifar as gc
 from itertools import product
 import time, os
 
 ##################
 ### Parameters ###
 ##################
+
+task_type = 'mnist'
 
 n_tasks = 30
 num_epochs_per_task = 2
@@ -16,7 +19,14 @@ param_xi	= 0.1
 minibatch_size	= 256
 learning_rate	= 0.001
 
-N0 = 784
+if task_type == 'mnist':
+	N0 = 784
+	No = 10
+	#num_examples = mnist.train.num_examples
+elif task_type == 'cifar':
+	N0 = 3*1024
+	No = 10
+
 N1 = 400
 N2 = 400
 
@@ -35,9 +45,21 @@ os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 tf.reset_default_graph()
 
 # Import MNIST data
-from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("/tmp/", one_hot=True)
+if task_type == 'mnist':
+	from tensorflow.examples.tutorials.mnist import input_data
+	mnist = input_data.read_data_sets("/tmp/", one_hot=True)
 
+	num_examples = mnist.train.num_examples
+	test_img_func = mnist.test.images
+
+	next_batch = mnist.train.next_batch
+elif task_type == 'cifar':
+	cifar = gc.data_set('cifar-10')
+
+	num_examples = cifar.num_examples
+	test_img_func = cifar.test_images
+	next_batch = cifar.next_batch
+	
 
 ##################################
 ### Model function definitions ###
@@ -126,8 +148,8 @@ b1 = bias_variable(N1, 'b1')
 W2 = weight_variable(N1, N2, 'W2')
 b2 = bias_variable(N2, 'b2')
 
-Wo = weight_variable(N2, 10, 'Wo', no_dend=True)
-bo = bias_variable(10, 'bo', no_dend=True)
+Wo = weight_variable(N2, No, 'Wo', no_dend=True)
+bo = bias_variable(No, 'bo', no_dend=True)
 
 # Defining clamp interactions
 W1_effective = tf.reduce_sum(W1*W1_clamp, axis=1)
@@ -165,12 +187,12 @@ for var, task_num in product(variables, range(n_tasks)):
 	previous_weights_mu_minus_1[var.op.name, task_num] = tf.Variable(tf.zeros(var.get_shape()), trainable=False)
 	big_omega_var[var.op.name, task_num] = tf.Variable(tf.zeros(var.get_shape()), trainable=False)
 
-	aux_loss += tf.reduce_sum(tf.multiply( big_omega_var[var.op.name, task_num], tf.square(previous_weights_mu_minus_1[var.op.name, task_num] - var) ))
+	aux_loss += tf.reduce_sum(tf.multiply(big_omega_var[var.op.name, task_num], tf.square(previous_weights_mu_minus_1[var.op.name, task_num] - var)))
 
-	reset_small_omega_ops.append( tf.assign( previous_weights_mu_minus_1[var.op.name, task_num], var ) )
-	reset_small_omega_ops.append( tf.assign( small_omega_var[var.op.name, task_num], small_omega_var[var.op.name, task_num]*0.0 ) )
+	reset_small_omega_ops.append(tf.assign(previous_weights_mu_minus_1[var.op.name, task_num], var))
+	reset_small_omega_ops.append(tf.assign(small_omega_var[var.op.name, task_num], small_omega_var[var.op.name, task_num]*0.0))
 
-	update_big_omega_ops.append( tf.assign_add( big_omega_var[var.op.name, task_num],  task_vector[task_num]*tf.div(small_omega_var[var.op.name, task_num], \
+	update_big_omega_ops.append(tf.assign_add( big_omega_var[var.op.name, task_num], task_vector[task_num]*tf.div(small_omega_var[var.op.name, task_num], \
 		(param_xi + tf.square(var-previous_weights_mu_minus_1[var.op.name, task_num])))))
 
 # After each task is complete, call update_big_omega and reset_small_omega
@@ -232,7 +254,6 @@ task_permutation = []
 for task in range(n_tasks):
 	task_permutation.append(np.random.permutation(N0))
 
-
 avg_performance = []
 first_performance = []
 last_performance = []
@@ -257,24 +278,26 @@ for task in range(n_tasks):
 			print("\t Epoch ",epoch,' Epoch time ', time.time() - t0)
 			t0 = time.time()
 
-		for i in range(mnist.train.num_examples//minibatch_size):
+		for i in range(num_examples//minibatch_size):
 		#for i in range(2):
 			# Permute batch elements
-			batch = mnist.train.next_batch(minibatch_size)
-			batch = (batch[0][:, task_permutation[task]], batch[1])
+			# batch = (input, output)
+			t1 = time.time()
+			batch = next_batch(minibatch_size)
+			print(time.time()-t1)
+			batch = (batch[0][:,task_permutation[task]], batch[1])
 
 			sess.run([train, update_small_omega, big_omega_var], feed_dict={x:batch[0], y_tgt:batch[1], task_vector: tv, \
 				W1_clamp: W1c[task,:,:,:], W2_clamp: W2c[task,:,:,:], b1_clamp: b1c[task,:,:,:], b2_clamp: b2c[task,:,:,:]})
 
 	sess.run(update_big_omega, feed_dict = {task_vector: tv})
 	omegas = sess.run(big_omega_var)
-
 	sess.run(reset_small_omega)
 
 	# Print test set accuracy to each task encountered so far
 	avg_accuracy = 0.0
 	for test_task in range(task+1):
-		test_images = mnist.test.images
+		test_images = test_img_func
 
 		# Permute batch elements
 		test_images = test_images[:, task_permutation[test_task]]
